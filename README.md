@@ -1,65 +1,20 @@
-Pipelined FFT [![Build Status](https://travis-ci.org/ucb-art/fft.svg?branch=master)](https://travis-ci.org/ucb-art/fft)
-=======================
-
 # Overview
 
 This project contains a streaming, pipelined Fast Fourier Transform (FFT).
 Twiddle factors are hard-coded for you.
 The transform is split into pipelined Biplex FFTs and a direct form FFT to multiplex the logic for large FFT sizes.
 
-# Usage
-
-## GitHub Pages
-
-See [here](https://ucb-art.github.io/fft/latest/api/) for the GitHub pages scaladoc.
-
-## Setup
-
-Clone the repository and update the depenedencies:
-
-```
-git clone git@github.com:ucb-art/fft.git
-git submodule update --init
-cd dsp-framework
-./update.bash no_hwacha
-cd ..
-```
-
-See the [dsp-framework README](https://github.com/ucb-art/dsp-framework/blob/master/README.md) for more details on this infrastructure.
-Build the dependencies by typing `make libs`.
-
-## Building
-
-The build flow generates FIRRTL, then generates Verilog, then runs the TSMC memory compiler to generate memories.
-Memories are black boxes in the Verilog by default.
-IP-Xact is created with the FIRRTL.
-The build targets for each of these are firrtl, verilog, and mems, respectively.
-Depedencies are handled automatically, so to build the Verilog and memories, just type `make mems`.
-Results are placed in a `generated-src` directory.
-
-## Testing
-
-To test the block, type `make test`.
-This runs the block tester in the `src/test/scala` directory.
-
-## Configuring
-
-In `src/main/scala` there is a `Config.scala` file.
-A few default configurations are defined for you, called DefaultStandaloneXFFTConfig, where X is either Real or FixedPoint.
-These generate a small FFT with default parameters.
-To run them, type `make verilog CONFIG=DefaultStandaloneXFFTConfig`, replacing X with Real or FixedPoint.
-The default make target is the default FixedPoint configuration.
-
-The suggested way to create a custom configuration is to modify CustomStandaloneFFTConfig, which defines values for all possible parameters.
-Then run `make verilog CONFIG=CustomStandaloneFFTConfig` to generate the Verilog.
-Choosing lanes = FFT size (n) (both default to 8) only creates a direct form FFT.
-
 # Specifications
 
-## Interfaces
+## Parameters
+- `n`: This is the size (points) of the FFT.
+- `pipelineDepth`: This is the number of pipeline registers to add, up to the number of butterfly stages of the Cooley-Tukey algorithm.
+- `lanes`: This is the number of parallel input lanes for time-series data. Must be a power of 2, a minimum of 2, and maxiumum of `n`.
 
-The FFT uses the [DSP streaming interface](https://github.com/ucb-art/rocket-dsp-utils/blob/master/doc/stream.md) (a subset of AXI4-Stream) on both the data input and data output.
-There are nominally no status or control registers, so no SCR file exists.
+## IOs
+- `in`: Time-domain ValidWithSync input of type `Vec(lanes, genIn)`
+- `out`: Frequency-domain ValidWithSync output of type `Vec(lanes, genOut)`
+
 
 ## Signaling
 
@@ -141,3 +96,5 @@ Pipeline registers favor the direct form FFT slightly, though the critical path 
 
 ![Split FFT](/doc/splitfft.png?raw=true)
 
+## Testing
+- Unit test: `sbt "testOnly mimo.FFTSpec"`. Test exercises a 256-point fixed-point FFT with IO width of 16 and binary point of 12. 256 real and imaginary values are loaded in via the files `src/test/resources/FFT_Real.csv` and `src/test/resources/FFT_Imag.csv`. These values are then scaled by 1/256 as in the tail, to avoid overflowing intermediate values in the FFT. The resulting spectrum is compared to a the output of Scala Breeze's fourierTr function.
